@@ -67,6 +67,13 @@ Wczytujemy dane $(x_1, y_1), ..., (x_n, y_n)$ z pliku "lab 1 i 2.xlsx".
 dane <- as.data.frame(read_excel("lab-1-i-2.xlsx"))
 ```
 
+```{r}
+liczba_wierszy <- nrow(dane)
+```
+
+
+Dane zawierają `r liczba_wierszy` obserwacji.
+
 # Zadanie 1
 
 ```{r}
@@ -103,6 +110,8 @@ kable(wskazniki_tabela, row.names = FALSE, digits = 4)
 
 Tabela przedstawia wskaźniki numeryczne dla każdej ze zmiennych $x$ oraz $y$.
 
+Zauważalny jest równomierny rozkład wartości zmiennej x między minimum a maksimum wartości zmiennej x.
+
 # Zadanie 2
 
 Tworzymy wykres rozrzutu zmiennych $x$ oraz $y$. Wyznaczamy także próbkowy współczynnik korelacji tych zmiennych.
@@ -117,7 +126,9 @@ plot(dane$x, dane$y)
 prob_wsp_kor <- cor(dane$x, dane$y)
 ```
 
-Wykres rozrzutu zmiennych $y$ i $x$ pokazuje wyraźną zależność liniową między zmiennymi. Punkty układają się wzdłuż funkcji prostej, co sugeruje że liniowy model regresji będzie dobrze dopasowany do danych. Potwierdza to także wartość próbkowego współczynnika korelacji (`r prob_wsp_kor`), która jest bardzo bliska 1, tzn. w danych występuje silna dodatnia zależność liniowa.
+Wykres rozrzutu zmiennych $y$ i $x$ pokazuje wyraźną zależność liniową między zmiennymi. Punkty układają się wzdłuż funkcji prostej, co sugeruje że liniowy model regresji będzie dobrze dopasowany do danych. Potwierdza to także wartość próbkowego współczynnika korelacji (`r prob_wsp_kor`), która jest bardzo bliska 1, tzn. w danych występuje silna dodatnia zależność liniowa. Nie zauważamy także istotnej zmienności wariancji.
+Zatem, rozpatrywany w tym przykładzie model regresji liniowej ma sens. Występuje niezerowy trend, co
+było widoczne na wykresie rozrzutu.
 
 # Zadanie 3
 
@@ -157,16 +168,12 @@ Wartość estymatora $\widehat{\sigma^2}$ wynosi `r est_sigma_kw`.
 Weryfikujemy hipotezę $H_0: \beta_1 = 0$ przy hipotezie alternatywnej $H_1: \beta_1 \neq 0$ na poziomie istotności $\alpha = 0.05$.
 
 ```{r, echo = TRUE}
-# Na poziomie istotności a = 0, 05 zweryfikuj hipotezę H0 : beta1= 0 przy
-# hipotezie alternatywnej H1 : beta1 = 0.
-
 SE_beta_1_kw <- est_sigma_kw/sum((dane$x - sr_x)^2)
 
 statystyka_T <- est_beta_1/sqrt(SE_beta_1_kw)
 
 p_value <- 2*(1 - pt( abs(statystyka_T), length(dane$x) - 2) )
 
-# p_value jest mniejsze niż zadany poziom istotności, zatem odrzucamy H0
 ```
 
 Wartość statystyki testowej $T$ wynosi `r statystyka_T`, natomiast $p$-wartość = `r p_value`. Wartość poziomu krytycznego jest niższy od zadanego poziomu istotności, zatem odrzucamy hipotezę zerową. Oznacza to że wartość estymatora $\widehat{\beta_1}$ jest istotnie różna od zera.
@@ -203,7 +210,7 @@ T_Y_lower <- est_Y_x0 -  qt(1- 0.01/2, length(dane$x) - 2 )*sqrt(SE_kw_estY_Y)
 
 ```
 
-Dolna granica realizacji przedziału dla $Y(x_0)$ wynosi `r T_Y_upper`, natomiast górna ma wartość `r T_Y_lower`.
+Dolna granica realizacji przedziału dla $Y(x_0)$ wynosi `r T_Y_lower`, natomiast górna ma wartość `r T_Y_upper`.
 
 # Zadanie 8
 
@@ -216,11 +223,11 @@ rezydua <- dane$y - y_est
 
 ```{r }
 hist(rezydua, freq = FALSE)
-
-shp_test_pval <- shapiro.test(rezydua)
 ```
 
-Na wykresie można zauważyć, że rozkład wartości rezyduów jest bliski rozkładowi symetrycznemu. Dodatkowo, rozkład przypomina kształt dzwonu, tzn. jest bliski rozkładowi normalnemu. Możemy wykorzystać formalne testy, np. test Shapiro-Wilka (`shapiro.test()`) do zweryfikowania hipotezy zerowej, że realizacja próby pochodzi z próby o rozkładzie normalnym. Przyjmujemy poziom istotności $\alpha$= 0.05. Otrzymujemy $p$-wartość równą `r shp_test_pval$p.value`, wartość ta jest większa od zadanego poziomu istotności, zatem nie mamy podstaw do odrzucenia hipotezy zerowej.
+Analizując histogram dla rezyduów, możemy mieć wątpliwości co do normalności rozkładu. Rozkład wydaje się nie być idealnie symetryczny. Widoczna jest także lekka prawostronna skośność. Jednak może to wynikać ze zbyt małego rozmiaru próby (`r liczba_wierszy`). Zatem, histogram może nie być najbardziej odpowiednim narzędziem do weryfikacji.
+
+
 
 ```{r}
 qqnorm(rezydua)
@@ -240,8 +247,6 @@ Wykonujemy także wykres rozrzutu dla par $(x_1, e_1), ... ,(x_n, e_n)$.
 
 ```{r}
 plot(dane$x, rezydua)
-
-# Wykresy wychodzą niemal identyczne
 ```
 
 Na wykresach rozrzutu nie zauważamy żadnych regularnych wzorców, struktur czy trendu. Dane są rozproszone wokół osi $Ox$, co spełnia teoretyczne założenia poprawności modelu regresji.
@@ -260,7 +265,8 @@ nowe_dane$y[nrow(dane)] <- dane$y[nrow(dane)]*10
 nowe_sr_x <- mean(nowe_dane$x)
 nowe_sr_y <-  mean(nowe_dane$y)
 
-nowe_est_beta_1 <-  sum((nowe_dane$x-nowe_sr_x)*(nowe_dane$y - nowe_sr_y))/ sum((nowe_dane$x - nowe_sr_x)^2)
+nowe_est_beta_1 <- sum((nowe_dane$x-nowe_sr_x)*(nowe_dane$y - nowe_sr_y))/
+                        sum((nowe_dane$x - nowe_sr_x)^2)
 nowe_est_beta_0 <- nowe_sr_y - nowe_est_beta_1*nowe_sr_x
 
 
@@ -273,9 +279,9 @@ plot(nowe_dane)
 
 Nowe estymatory wynoszą odpowiednio:
 
-* $\tilde{\beta_0}$ = `r nowe_est_beta_0` - różnica względem poprzedniego estymatora wynosi $\tilde{\beta_0}$ - $\widehat{\beta_0}$ = `r nowe_est_beta_0 - est_beta_0`,
+* $\tilde{\beta_0}$ = `r nowe_est_beta_0` - bezwględna różnica względem poprzedniego estymatora wynosi $|\tilde{\beta_0}$ - $\widehat{\beta_0}|$ = `r abs(nowe_est_beta_0 - est_beta_0)`,
 
-* $\tilde{\beta_1}$ = `r nowe_est_beta_1` - różnica względem poprzedniego estymatora wynosi $\tilde{\beta_1}$ - $\widehat{\beta_1}$ = `r nowe_est_beta_1 - est_beta_1`.
+* $\tilde{\beta_1}$ = `r nowe_est_beta_1` - bezwględna różnica względem poprzedniego estymatora wynosi $|\tilde{\beta_1}$ - $\widehat{\beta_1}|$ = `r abs(nowe_est_beta_1 - est_beta_1)`.
 
 Wartości estymatorów istotnie się zmieniły. Możemy zauważyć znaczny wzrost wartości estymatora $\tilde{\beta_0}$ względem estymatora $\widehat{\beta_0}$ oraz zmianę znaku estymatora $\widehat{\beta_1}$ na ujemny ($\tilde{\beta_1}$ przyjmuje także znacznie mniejszą wartość), przez co trend w modelu zmienił się z rosnącego na malejący.
 
@@ -284,7 +290,7 @@ Zatem zmiana wartości zmiennej objaśnianej dla jednej wartości, spowodowała 
 # Zadanie 10
 
 Wykonujemy analogiczną analizę, jak w poprzednich zadaniach, dla danych wygenerowanych.
-Generujemy realizacje próby $x_1,...,x_n$ z rozkładu $U(-2,2)$
+Generujemy realizacje próby $x_1,...,x_n$ z rozkładu $U(-2,2)$.
 
 ```{r, echo = TRUE}
 set.seed(282241)
@@ -314,11 +320,14 @@ gen_est_beta_0 <- gen_sr_y - gen_est_beta_1*gen_sr_x
 
 ```
 
-Przeprowadzamy analizę dla różnych wartości odchylenia standardowego $\sigma = 0.1$, $\sigma = 0.5$ oraz $\sigma = 1$.
+Wartości estymatorów wynoszą odpowiednio:
 
-```{r}
-# Bety z reguły są lepsze dla mniejszego sigma
-```
+* $\widehat{\beta_0}=$ `r gen_est_beta_0`,
+* $\widehat{\beta_1}=$ `r gen_est_beta_1`.
+
+Oba estymatory mają wartości bardzo zbliżone do wartości odpowiednich parametrów $\beta_0$ = 1 i $\beta_1$ = 2.
+
+Przeprowadzamy analizę dla różnych wartości odchylenia standardowego ($\sigma = 0.5$ oraz $\sigma = 1$) i porównujemy wartości estymatorów oraz współczynnika $R^2$.
 
 Tworzymy funkcję `generuj_obserwacje()`, która wyznacza estymatory $\widehat{\beta_0}$, $\widehat{\beta_1}$ na podstawie wygenerowanych danych, a także wartość współczynnika $R^2$. Jako parametr podajemy wartość odchylenia standardowego $\sigma$.
 
@@ -338,6 +347,8 @@ epsilon <- rnorm(n, mean = 0, sd = sigma)
 # Wygeneruj obserwacje
 y_gen <- b0 + b1*x + epsilon
 
+plot(x,y_gen)
+
 gen_sr_x <- mean(x)
 gen_sr_y <- mean(y_gen)
 
@@ -346,11 +357,11 @@ gen_est_beta_0 <- gen_sr_y - gen_est_beta_1*gen_sr_x
 
 y_pred <- gen_est_beta_0 + gen_est_beta_1*x
 
-SSR <- sum((y_gen-y_pred)^2)
+SSE <- sum((y_gen-y_pred)^2)
   
 SST <- sum((y_gen - gen_sr_y)^2)
 
-R_kw <- 1- SSR/SST
+R_kw <- 1- SSE/SST
 
 return(c(gen_est_beta_0, gen_est_beta_1, R_kw))
 }
@@ -359,11 +370,35 @@ return(c(gen_est_beta_0, gen_est_beta_1, R_kw))
 
 
 ```{r}
-generuj_obserwacje(0.1)
-generuj_obserwacje(0.5)
-generuj_obserwacje(1)
+obs1 <- generuj_obserwacje(0.1)
+obs2 <- generuj_obserwacje(0.5)
+obs3 <- generuj_obserwacje(1)
 # Zmienia się wraz ze wzrostem wariancji
 
 # Jak zmieniają się precyzja
 # estymatorów i współczynnik R2, gdy rośnie wariancja?
 ```
+
+Z wykresów możemy odczytać, ze wraz ze wzrostem wariancji, chmura punktów jest bardziej rozproszona wokół funkcji liniowej.
+
+Dla $\sigma = 0.5$ wyniki są następujące:
+
+* $\widehat{\beta_0}=$ `r obs2[1]`,
+* $\widehat{\beta_1}=$ `r obs2[2]`,
+* $R^2 =$ `r obs2[3]`.
+
+Dla $\sigma = 1$ wyniki są następujące:
+
+* $\widehat{\beta_0}=$ `r obs3[1]`,
+* $\widehat{\beta_1}=$ `r obs3[2]`,
+* $R^2 =$ `r obs3[3]`.
+
+Wraz ze wzrostem $\sigma^2$ zauważalny jest spadek wartości $R^2$ oraz precyzji wyznaczonych estymatorów. Oba
+otrzymane wyniki są gorsze w porównaniu z wynikami dla $\sigma$ = 0.1. W przypadku estymatora $\widehat{\beta_0}$ wynik dla
+$\sigma$ = 0.5 jest bliższy $\beta_0$ = 1 niż przypadku $\sigma$ = 1. Jednak dla estymatora $\widehat{\beta_1}$ jego wartość jest bliższa wartości
+$\beta_1$ = 2 dla $\sigma$ = 1 niż dla $\sigma$ = 0.5 (może to być efekt losowy, wynikający z generowania danych z konkretnego
+ziarna).
+
+
+
+
