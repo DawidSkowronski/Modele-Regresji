@@ -1,0 +1,60 @@
+---
+title: "Sprawozdanie 2"
+author: "Dawid Skowroński"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    number_sections: true
+    dev: cairo_pdf
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage[OT4]{polski}
+- \usepackage[utf8]{inputenc}
+- \usepackage{graphicx}
+- \usepackage{float}
+- \usepackage{amsmath}
+- \usepackage{rotating}
+- \usepackage{bbm}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{float}
+- \usepackage{graphicx}
+- \renewcommand{\contentsname}{Spis treści}
+- \renewcommand{\listfigurename}{Spis wykresów i rysunków}
+- \renewcommand{\listtablename}{Spis tabel}
+- \renewcommand{\figurename}{Wykres}
+- \renewcommand{\tablename}{Tabela}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.height = 4,
+  out.extra='',
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE,
+  cache=FALSE,
+  dev.args = list(png = list(type = "cairo")))
+
+knitr::opts_chunk$set(
+  fig.pos = "H",
+  out.extra = "",
+  fig.align = "center",
+  dev = "pdf",
+  dev.args = list(encoding="CP1257.enc")
+)
+
+```
+
+```{r biblioteki}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(readxl)
+library(kableExtra)
+```
