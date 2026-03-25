@@ -34,7 +34,13 @@ mac_korelacji <- cor(dane)
 round(mac_korelacji,3)
 
 library(corrplot)
-corrplot(mac_korelacji, method = "number", type = "upper")
+
+corrplot(mac_korelacji, method = "number",
+         type = "upper",
+         tl.col = "black",
+         number.cex = 0.8,
+         col = c("red", "blue"), 
+         bg = "white")
 
 
 
@@ -103,6 +109,18 @@ vif(model_prosty3)
 
 # Czyli mamy prostszy model bez X8, X9, X10
 
+vif.val <- vif(model_pelny)
+
+# Automatyzacja
+while(any(vif.val>10)){
+  zmienna.do.usuniecia <- names(which.max(vif.val))
+  form <- formula(model)
+  form.nowa <- update(form, paste(".~.-", zmienna.do.usuniecia))
+  model <- lm(form.nowa, dane)
+  vif.val <- vif(model)
+  print(vif.val)
+}
+
 
 #5. Zidentyfikuj i ewentualnie usuń z próby obserwacje, które mogą być wpływowe.
 
@@ -122,7 +140,7 @@ dim(H)
 n <- nrow(H)
 
 # elementy na diagonali macierzy H
-dzwignie <- diag(H)
+wplywy <- diag(H)
 
 # Ślad macierzy
 p <- sum(diag(H)) #powinno się równać liczbie zmiennych objaśniających
@@ -135,6 +153,34 @@ stud_rez <- rstudent(model_prosty3)
 
 # Odległość Cooka
 odl_Cook <- cooks.distance(model_prosty3)
+
+n <- nrow(dane)
+p <- length(coef(model_prosty3))
+lev <- hatvalues(model_prosty3)
+cook <- cooks.distance(model_prosty3)
+rstud <- rstudent(model_prosty3)
+
+prog.lev <- 2*p/n
+prog.cook <- 4/(n-p)
+prog.rstud <- 2
+
+indeks.lev <- which(lev>prog.lev)
+indeks.cook <- which(cook>prog.cook)
+indeks.rstud <- which(abs(rstud)>prog.rstud)
+
+indeksy.do.usuniecia <- sort(unique(c(indeks.lev,
+                                      indeks.cook,
+                                      indeks.rstud)))
+
+dane_nowe <- dane[-indeksy.do.usuniecia,]
+
+plot(cook, pch=19, col = "blue")
+abline(prog.cook,0)
+text(x=indeks.cook, y = cook[indeks.cook]+0.003, labels = indeks.cook)
+
+# To samo dla Rstud i lev
+
+
 
 
 # Ramka danych wszystkich obserwacji hii, ri, Di
@@ -180,7 +226,7 @@ dim(Y_nowe)
 model_nowy <- lm(Y_nowe~., data = cbind(Y_nowe = Y_nowe,X_nowe))
 
 nowe_est_beta <- coefficients(model_nowy)
-
+summary(model_nowy)
 
 # test F
 anova(model_nowy)

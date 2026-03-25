@@ -57,4 +57,261 @@ library(ggplot2)
 library(patchwork)
 library(readxl)
 library(kableExtra)
+library(car)
+library(GGally)
+library(corrplot)
 ```
+
+Wczytujemy dane z pliku "regresja wielokrotna 2026.xlsx".
+
+```{r echo=TRUE}
+dane <- as.data.frame(read_excel("regresja wielokrotna 2026.xlsx"))
+
+n <- nrow(dane)
+X <- dane[,-ncol(dane)]
+Y <- dane[, ncol(dane)]
+czy_obs_na <- sum(is.na(dane))
+```
+
+Dane zawierają `r n` obserwacji. W danych występuje `r czy_obs_na` obserwacji brakujących.
+
+# Zadanie 1
+
+Wykonujemy wykresy rozrzutu dla par $(Y, X_i)$ oraz $(X_i,X_j)$. W tym celu możemy skorzystać z funkcji `pairs()`.
+
+```{r fig.width=9, fig.height=9}
+pairs(dane)
+```
+
+a) Z wykresów rozrzutu możemy odczytać, że zmienna $X_6$ wykazuje wyraźny liniowy związek ze zmienną objaśnianą Y. Dla zmiennych $X_8$, $X_9$ i $X_{10}$ obserwujemy istotny (lecz mniej wyraźny) liniowy związek ze zmienną objaśnianą Y. Zatem, zmienne $X_6$, $X_8$, $X_9$ i $X_{10}$ mogą mieć liniowy wpływ na zmienną objaśnianą Y.
+
+b) Dla par $(X_2, X_8)$, $(X_2, X_{10})$, $(X_6, X_9)$ oraz $(X_8, X_{10})$ obserwujemy silną liniową korelację zmiennych. Zatem, występuje problem współliniowości w danych.
+
+c) Na podstawie wykresów, możemy stwierdzić występowanie obserwacji odstających m.in. dla par $(X_6, Y)$, $(X_9, Y)$, $(X_2, Y)$.
+
+# Zadanie 2
+
+Wyznaczamy macierz korelacji dla zmiennych $Y,X_1,..., X_{10}$.
+
+```{r echo = TRUE}
+# Macierz korelacji
+mac_korelacji <- round(cor(dane),3)
+```
+
+```{r fig.width=6, fig.height=6}
+corrplot(mac_korelacji, method = "color",
+         addCoef.col = "black",
+         type = "upper",
+         tl.col = "black",
+         number.cex = 0.8,
+         bg = "white")
+```
+
+Obserwujemy wysoką wartość korelacji próbkowej dla par $(X_2,X_8)$, $(X_2, X_{10})$, $(X_8, X_{10})$ oraz $(X_6, Y)$. Wartości bliskie 0.6 otrzymano dla par $(X_2,Y)$, $(X_8,Y)$, $(X_{10},Y)$. Wartości bliskie -1 otrzymano dla par $(X_6, X_9)$ oraz $(X_9, Y)$.
+
+Na tej podstawie możemy wyciągnąć podobne wnioski jak w przypadku zadania 1. Wartości współczynnika korelacji próbkowej potwierdzają analizę opartą na wykresach rozrzutu.
+
+
+# Zadanie 3
+
+Tworzymy model regresji liniowej dla zmiennej objaśnianej $Y$ i zmiennych objaśniających $X_1,..., X_{10}$.
+
+```{r echo = TRUE}
+model_pelny <- lm(Y~. , data = dane)
+estymatory_beta <- coef(model_pelny)
+
+opis_modelu <- summary(model_pelny)
+wart_F <- opis_modelu$fstatistic
+p_F <- pf(wart_F, opis_modelu$df[1], opis_modelu$df[2],
+            lower.tail = FALSE)
+p_wart <- p_F[1]
+
+# R^2 i skorygowany R^2
+R_kw <- summary(model_pelny)$r.squared
+adj_R_kw <- summary(model_pelny)$adj.r.squared
+```
+
+
+a) W tabeli przedstawione zostały wartości estymatorów najmniejszych kwadratów $\widehat{\beta}$. Możemy zauważyć, wszystkie wartości są istotnie różne od zera.
+
+```{r}
+estymatory_df <- data.frame(
+  Zmienna = names(estymatory_beta),
+  Estymator = round(as.numeric(estymatory_beta), 5)
+)
+
+kable(estymatory_df, 
+      col.names = c("Zmienna", "Wartość estymatora")
+      )
+```
+
+b) Wykonujemy test o braku liniowego wpływu zmiennych objaśniających na zmienną objaśnianą. Testujemy hipotezę $H_0: \beta_1 =...=\beta_{10} = 0$ przeciwko hipotezie alternatywnej $H_1: \exists i \in {1,...,10}\quad \beta_i \neq 0$. Otrzymujemy $p$-wartość testu $F$ równą `r p_wart`. Jest to wartość mniejsza od każdego sensownego poziomu istotności $\alpha$ (w szczególności $\alpha = 0.05$), zatem powinniśmy odrzucić hipotezę $H_0$. Oznacza to że w modelu przynajmniej jedna ze zmiennych $X_1,...,X_{10}$ ma liniowy wpływ na $Y$.
+
+c) Wartość współczynnika $R^2$ wynosi `r R_kw`, natomiast wartość skorygowanego współczynnika $R^2$ wynosi `r adj_R_kw`. W obu przypadkach otrzymujemy wartość bardzo bliską 1. Sugeruje to bardzo dobre wyjaśnienie zmienności danych i dopasowanie modelu do obserwacji.
+
+
+# Zadanie 4
+
+Zajmujemy się problemem współliniowości. W tym celu dla każdej ze zmiennych objaśniających wyznaczamy wskaźnik podbicia wariancji VIF i analizujemy ich wartości. Posłużymy się funkcją `vif()` z pakietu `car`.
+
+```{r echo = TRUE}
+vif(model_pelny)
+
+X_prosty1 <- X[,-8]
+
+model_prosty1 <- lm(Y~., data = cbind(Y=Y,X_prosty1))
+```
+
+
+Możemy zauważyć, że największa wartość VIF jest osiągana dla $X_8$ i przekracza wartość 10. Zatem, tworzymy nowy model bez zmiennej $X_8$.
+
+```{r echo = TRUE}
+vif(model_prosty1)
+
+X_prosty2 <- X_prosty1[,-8]
+
+model_prosty2 <- lm(Y~., data = cbind(Y=Y,X_prosty2))
+```
+
+Największa wartość VIF jest osiągana dla $X_9$ i przekracza wartość 10. Zatem, tworzymy kolejny,  nowy model bez zmiennej $X_9$.
+
+```{r echo = TRUE}
+vif(model_prosty2)
+X_prosty3 <- X_prosty2[,-8]
+```
+
+Największa wartość VIF jest osiągana dla $X_{10}$ i przekracza wartość 10. Zatem, tworzymy kolejny,  nowy model bez zmiennej $X_{10}$.
+
+
+```{r echo = TRUE}
+model_prosty3 <- lm(Y~., data = cbind(Y=Y,X_prosty3))
+vif(model_prosty3)
+```
+
+W modelu bez zmiennych $X_8, X_9, X_{10}$ nie obserwujemy już wartości VIF powyżej 10. Rozpatrujemy zatem w kolejnych zadaniach uproszczony model bez tych zmiennych.
+
+# Zadanie 5
+
+Sprawdzamy, czy w danych występują obserwacje wpływowe. 
+W tym celu analizujemy wpływy kolejnych obserwacji $h_{11}, h_{nn}$ (główna przekątna macierzy $H$), studentyzowane rezydua $r_i$ oraz odległość Cook'a $D_i$.
+
+
+Sprawdzamy na podstawie $h_{ii}$, czy występują obserwacje odstające względem $X$. Obserwacje i-tą uznajemy za odstającą ze wględu na $X$, gdy $h_{ii} >= \frac{2p}{n}$.
+
+Rozpatrujemy studentyzowane rezydua.
+Uznajemy i-tą obserwację za odstającą ze względu na $Y$, gdy $|r_i|>2$.
+
+W przypadku odległości Cook'a, obserwację i-tą uznajemy za wpływową, gdy $D_i > \frac{4}{n-p}$.
+
+```{r echo = TRUE}
+# Liczba obserwacji
+n <- nrow(dane)
+
+# Ślad macierzy
+p <- length(coef(model_prosty3))
+
+# Elementy na diagonali macierzy H
+lev <- hatvalues(model_prosty3)
+# Odległość Cook'a
+cook <- cooks.distance(model_prosty3)
+# Studentyzowane rezydua
+rstud <- rstudent(model_prosty3)
+
+prog.lev <- 2*p/n
+prog.cook <- 4/(n-p)
+prog.rstud <- 2
+
+indeks.lev <- which(lev>prog.lev)
+indeks.cook <- which(cook>prog.cook)
+indeks.rstud <- which(abs(rstud)>prog.rstud)
+
+
+indeksy.do.usuniecia <- sort(unique(c(indeks.lev,
+                                      indeks.cook,
+                                      indeks.rstud)))
+
+dane_nowe <- dane[-indeksy.do.usuniecia,]
+```
+
+Obserwacje, które należy usunąć mają indeksy:
+`r indeksy.do.usuniecia`.
+
+Na wykresie oznaczono indeksami obserwacje, które uznano za wpływowe (na podstawie odległości Cook'a). 
+
+```{r}
+
+plot(cook, pch=19, col = "deepskyblue")
+abline(prog.cook,0, col= "red")
+text(x=indeks.cook, y = cook[indeks.cook]+0.0004, labels = indeks.cook)
+```
+
+Na wykresie oznaczono indeksami obserwacje, które uznano za odstające (na podstawie wpływów $h_{ii}$). 
+
+```{r}
+plot(rstud, pch=19, col = "deepskyblue")
+abline(prog.rstud,0, col= "red")
+abline(-prog.rstud,0, col= "red")
+text(x=indeks.rstud, y = rstud[indeks.rstud]+0.0004, labels = indeks.rstud)
+```
+
+Na wykresie oznaczono indeksami obserwacje, które uznano za odstające (na podstawie studentyzowanych rezyduów). 
+
+```{r}
+plot(lev, pch=19, col = "deepskyblue")
+abline(prog.lev,0, col= "red")
+text(x=indeks.lev, y = lev[indeks.lev]+0.0004, labels = indeks.lev)
+```
+
+
+# Zadanie 6
+
+Na podstawie analizy z poprzednich zadań tworzymy nowy, uproszczony model.
+
+
+```{r echo = TRUE}
+X_nowe <- X_prosty3[-indeksy.do.usuniecia,]
+
+Y_nowe <- Y[-indeksy.do.usuniecia]
+Y_nowe <- as.matrix(Y_nowe)
+
+model_nowy <- lm(Y_nowe~., data = cbind(Y_nowe = Y_nowe,X_nowe))
+
+nowe_est_beta <- coefficients(model_nowy)
+
+
+opis_modelu <- summary(model_pelny)
+wart_F_nowy <- opis_modelu$fstatistic
+p_F_nowy <- pf(wart_F_nowy,
+          opis_modelu$df[1],
+          opis_modelu$df[2],
+          lower.tail = FALSE)
+p_wart <- p_F_nowy[1]
+
+
+R_kw_nowe <- summary(model_nowy)$r.squared
+adj_R_kw_nowe <- summary(model_nowy)$adj.r.squared
+
+```
+
+
+a) W tabeli przedstawione są wartości estymatorów najmniejszych kwadratów dla nowego modelu.
+
+```{r}
+estymatory_df_nowe <- data.frame(
+  Zmienna = names(nowe_est_beta),
+  Estymator = round(as.numeric(nowe_est_beta), 5)
+)
+
+kable(estymatory_df_nowe, 
+      col.names = c("Zmienna", "Wartość estymatora")
+      )
+```
+
+b) Ponownie przeprowadzamy test $F$, p-wartość wynosi `r p_wart`. Jest to wartość mniejsza od każdego sensownego poziomu istotności $\alpha$ (w szczególności $\alpha = 0.05$), zatem powinniśmy odrzucić hipotezę $H_0$. Oznacza to że w modelu uproszczonym przynajmniej jedna ze zmiennych objaśniających ma liniowy wpływ na $Y$.
+
+
+c) Wartość współczynnika $R^2$ wynosi `r R_kw_nowe`, natomiast wartość skorygowanego współczynnika $R^2$ wynosi `r adj_R_kw_nowe`. Ponownie, są to wartości bardzo bliskie 1. Otrzymaliśmy nieznacznie większe wartości względem modelu ze wszystkimi zmiennymi, oznacza to że uproszczony model jest nieznacznie lepiej dopasowany do danych.
+
+
+
+
