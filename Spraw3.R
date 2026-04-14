@@ -55,13 +55,14 @@ head(dane)
 # Korzystamy z funkcji step
 
 model <- lm(Y~., data = dane)
-step(model, scale = 0)
+step(model)
 
 # Model M bez X5 ma najniższą wartość AIC
 
 dane_aic <- dane[,-5]
 
 model_aic <- lm(Y~., data = dane_aic)
+plot(model_aic)
 
 # Estymatory MLE beta
 model_aic$coefficients
@@ -87,6 +88,12 @@ summary(model_aic)
 confint(model_aic, , level = 0.95) # Bo bierze alpha/2
 # Intercept ma najszerszą realizację przedziału 
 
+# Dla zmiennych X1, X2, X3, X4, X6, X7 realizacja przedziału nie zawiera 0
+# Potwierdza to wynik testu z poprzedniego punktu - zmienne te są statystycznie istotne
+
+# Intercept zawiera 0 w realizacji przedziału, potwierdza to brak istotności 
+# statystycznej wyrazu wolnego
+
 # (e) Wyznaczyć skorygowany współczynnik determinacji R2 adj w modelu M
 adj_R_kw <- summary(model_aic)$adj.r.squared
 
@@ -99,11 +106,26 @@ qqnorm(rezydua)
 qqline(rezydua, col = "red", lw = 2)
 
 
+# (b) wykresy reszt względem każdej ze zmiennych objaśniających
 
+zmienne <- c("X1", "X2", "X3", "X4", "X6", "X7")
+par(mfrow = c(2,3))
+for (zmienna in zmienne) {
+  plot(dane_aic[[zmienna]], rezydua,
+       main = paste("Reszty vs", zmienna),
+       xlab = zmienna)
+  abline(h=0, col = "red")
+}
+par(mfrow = c(1,1))
 
+# Żaden z wykresów nie wskazuje na osobliwe zachowanie zmiennych
+# Reszty są losowo rozproszone wokół osi y.
 
+# (c) wykresy reszt względem wartości przewidywanych przez model.
+y_predykcje <- model_aic$fitted.values 
+plot(y_predykcje, rezydua)
 
-
+# Chmura punktów jest losowo rozproszona, brak wzorców i trendów
 
 
 
