@@ -1,0 +1,100 @@
+---
+title: "Zadanie laboratoryjne 8"
+author: "Dawid Skowroński"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    number_sections: true
+    dev: cairo_pdf
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage[OT4]{polski}
+- \usepackage[utf8]{inputenc}
+- \usepackage{graphicx}
+- \usepackage{float}
+- \usepackage{amsmath}
+- \usepackage{rotating}
+- \usepackage{bbm}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{float}
+- \usepackage{graphicx}
+- \renewcommand{\contentsname}{Spis treści}
+- \renewcommand{\listfigurename}{Spis wykresów i rysunków}
+- \renewcommand{\listtablename}{Spis tabel}
+- \renewcommand{\figurename}{Wykres}
+- \renewcommand{\tablename}{Tabela}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  fig.width = 5,
+  fig.height = 5,
+  out.extra='',
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE,
+  cache=FALSE,
+  dev.args = list(png = list(type = "cairo")))
+
+knitr::opts_chunk$set(
+  fig.pos = "H",
+  out.extra = "",
+  fig.align = "center",
+  dev = "pdf",
+  dev.args = list(encoding="CP1257.enc")
+)
+
+```
+
+```{r biblioteki}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(readxl)
+library(kableExtra)
+library(car)
+library(GGally)
+library(corrplot)
+```
+
+# Zadanie 1
+
+```{r parametry}
+# Parametry
+n <- 10
+x <- (1:10)/2
+b1 <- 10
+b2 <- 3
+b3 <- 2
+sig <- 1/2
+```
+
+
+```{r generowanie_y}
+y_gen <- (b1*x)/(b2+x)+b3 + rnorm(10,mean = 0, sd = sig)
+y_gen
+```
+
+# Zadanie 2
+
+Funkcja $g(\boldsymbol{x}, \boldsymbol{\beta})$ ma postać
+
+$$g(x_i,\beta_1,\beta_2,\beta_3) = \frac{\beta_1 x_i}{\beta_2 + x_i} + \beta_3, \; \; i=1,...,n$$ 
+
+Gradient $\nabla g(\boldsymbol{x}, \boldsymbol{\beta})$ ma postać
+
+$$\nabla g(\boldsymbol{x}, \boldsymbol{\beta}) = \frac{\partial g(\boldsymbol{x}, \boldsymbol{\beta}) }{\partial \boldsymbol{\beta}} = \left[ \frac{x_i}{\beta_2 + x_i}, - \frac{\beta_1 x_i}{(\beta_2 + x_i)^2}, 1 \right]$$
+
+
+
+
+
+
+
+
+

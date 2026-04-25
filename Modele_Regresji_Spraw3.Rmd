@@ -1,0 +1,290 @@
+---
+title: "Sprawozdanie 3"
+author: "Dawid Skowroński"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    number_sections: true
+    dev: cairo_pdf
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage[OT4]{polski}
+- \usepackage[utf8]{inputenc}
+- \usepackage{graphicx}
+- \usepackage{float}
+- \usepackage{amsmath}
+- \usepackage{rotating}
+- \usepackage{bbm}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{float}
+- \usepackage{graphicx}
+- \renewcommand{\contentsname}{Spis treści}
+- \renewcommand{\listfigurename}{Spis wykresów i rysunków}
+- \renewcommand{\listtablename}{Spis tabel}
+- \renewcommand{\figurename}{Wykres}
+- \renewcommand{\tablename}{Tabela}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  fig.width = 5,
+  fig.height = 5,
+  out.extra='',
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE,
+  cache=FALSE,
+  dev.args = list(png = list(type = "cairo")))
+
+knitr::opts_chunk$set(
+  fig.pos = "H",
+  out.extra = "",
+  fig.align = "center",
+  dev = "pdf",
+  dev.args = list(encoding="CP1257.enc")
+)
+
+```
+
+```{r biblioteki}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(readxl)
+library(kableExtra)
+library(car)
+library(GGally)
+library(corrplot)
+```
+
+Korzystamy z danych otrzymanych po analizie zbioru „regresja wielokrotna.xlsx” ze sprawozdania 2.
+
+```{r}
+
+dane <- as.data.frame(read_excel("regresja wielokrotna 2026.xlsx"))
+
+n <- nrow(dane)
+X <- dane[,-ncol(dane)]
+Y <- dane[, ncol(dane)]
+
+model_pelny <- lm(Y~. , data = dane)
+X_prosty1 <- X[,-8]
+X_prosty2 <- X_prosty1[,-8]
+X_prosty3 <- X_prosty2[,-8]
+model_prosty3 <- lm(Y~., data = cbind(Y=Y,X_prosty3))
+
+# Liczba obserwacji
+n <- nrow(dane)
+
+# Ślad macierzy
+p <- length(coef(model_prosty3))
+
+# Elementy na diagonali macierzy H
+lev <- hatvalues(model_prosty3)
+# Odległość Cook'a
+cook <- cooks.distance(model_prosty3)
+# Studentyzowane rezydua
+rstud <- rstudent(model_prosty3)
+
+prog.lev <- 2*p/n
+prog.cook <- 4/(n-p)
+prog.rstud <- 2
+
+indeks.lev <- which(lev>prog.lev)
+indeks.cook <- which(cook>prog.cook)
+indeks.rstud <- which(abs(rstud)>prog.rstud)
+
+indeksy.do.usuniecia <- sort(unique(c(indeks.lev,
+                                      indeks.cook,
+                                      indeks.rstud)))
+dane_nowe <- dane[-indeksy.do.usuniecia,]
+
+X_nowe <- X_prosty3[-indeksy.do.usuniecia,]
+
+Y_nowe <- Y[-indeksy.do.usuniecia]
+Y_nowe <- as.matrix(Y_nowe)
+
+# Nowe dane do sprawozdania 3
+dane.nowe <- as.data.frame(cbind(X_nowe, Y=Y_nowe))
+```
+
+Dane zawierają `r nrow(dane.nowe)` wierszy oraz `r ncol(dane.nowe)` kolumn. Zawierają one zmienne objaśniające $X_1,X_2,...,X_7$ oraz zmienną objaśnianą $Y$.
+
+```{r}
+
+```
+
+
+## Zadanie 1
+
+
+Wykorzystujemy regresję krokową z kryterium AIC, aby wybrać najlepszy model regresji M (według kryterium AIC).
+
+```{r , echo=TRUE}
+model.min <- lm(Y~1, data = dane.nowe)
+model.max <- lm(Y~., data = dane.nowe)
+
+model.aic <- step(object = model.max,
+                  scope = list(lower = model.min, upper=model.max),
+                  direction = "backward",k=2)
+
+model.aic
+```
+
+Możemy zauważyć, że po wyeliminowaniu zmiennej $X_5$, wartość kryterium AIC zmalała. Zatem, najlepszym modelem, względem kryterium AIC, jest model ze zmiennymi objaśniającymi $X_1,X_2,X_3,X_4,X_6,X_7$. Nie jesteśmy w stanie dalej minimalizować tego kryterium, poprzez usuwanie poszczególnych zmiennych $X_i$.
+
+
+Zatem, usuwamy kolumnę 5 z analizowanego zbioru.
+
+```{r, echo=TRUE}
+dane_aic <- dane.nowe[,-5]
+```
+
+
+
+### podpunkt a
+
+Wyznaczamy estymatory najmniejszych kwadratów $\widehat{\beta}$ modelu M.
+
+```{r}
+estymatory_beta <- coefficients(model.aic)
+
+estymatory_df <- data.frame(
+  Zmienna = names(estymatory_beta),
+  Estymator = round(as.numeric(estymatory_beta), 5)
+)
+
+kable(estymatory_df, 
+      col.names = c("Zmienna", "Wartość estymatora")
+      )
+```
+
+Możemy zauważyć, że wszystkie zmienne są istotnie różne od zera.
+
+### podpunkt b
+
+Testujemy, czy którakolwiek ze zmiennych objaśniających w modelu **M** ma liniowy wpływ na zmienną objaśnianą. W tym celu przeprowadzamy test $F$.
+
+```{r, echo=TRUE}
+opis_modelu <- summary(model.aic)
+wart_F_nowy <- opis_modelu$fstatistic
+p_F_nowy <- pf(wart_F_nowy,
+               opis_modelu$df[1],
+               opis_modelu$df[2],
+               lower.tail = FALSE)
+p_wart <- p_F_nowy[1]
+```
+
+Wartość $p$-value wynosi `r p_wart`, jest ona niższa od jakiegokolwiek sensownego poziomu istotności dla testu. Zatem, odrzucamy hipotezę $H_0$. Przyjmujemy hipotezę $H_1: \exists i \in {1,2,3,4,6,7}\quad \beta_i \neq 0$. Oznacza to, że co najmniej jedna ze zmiennych objaśniających ma liniowy wpływ na Y.
+
+### podpunkt c
+
+Dla każdej zmiennej objaśniającej z modelu **M** testujemy, czy ma
+ona liniowy wpływ na zmienną objaśnianą przy uwzględnieniu pozostałych zmiennych objaśniających w modelu.
+
+```{r, echo=TRUE}
+
+summary(model.aic)$coefficients[,4]
+
+```
+
+Korzystając z testu t-Studenta na poziomie istotności $\alpha$ = 0.05, wszystkie hipotezy zerowe, tzn. $H_0: \beta_i = 0 \; \forall i \in \{1,2,3,4,6,7\}$, zostają odrzucone (nie uwzględniamy zmiennej `Intercept`).
+
+Zatem każda ze zmiennych objaśniających ma liniowy wpływ na zmienną objaśnianą.
+
+
+### podpunkt d
+
+Wyznaczamy realizacje przedziałów ufności na poziomie 0,95 dla współczynników regresji odpowiadających zmiennym z modelu **M**. Do wyznaczenia realizacji wykorzystujemy funkcję `confint()`.
+
+```{r}
+kable(confint(model.aic, level = 1-0.05),
+      caption = "Realizacje 95% przedziałów ufności dla
+      współczynników regresji odpowiadających
+      zmiennym z modelu M",
+      digits = 3)
+```
+
+Możemy zauważyć, że żadna z realizacji dla nietrywialnych zmiennych objaśniających, nie zawiera zera. Potwierdza to słuszność wniosków z podpunktu 1c. W przypadku zmiennych $X_1,X_2,X_3,X_4,X_6,X_7$ obserwujemy dość wąskie realizacje przedziałów.
+
+
+### podpunkt e
+
+Wyznaczamy skorygowany współczynnik determinacji $R^2_{adj}$ modelu **M**.
+
+```{r, echo=TRUE}
+adj_R_kw <- summary(model.aic)$adj.r.squared
+```
+
+Skorygowany współczynnik determinacji wynosi `r adj_R_kw`, jest to wartość bardzo bliska 1. Sugeruje to bardzo dobre wyjaśnienie zmienności danych i dopasowanie modelu do obserwacji.
+
+
+## Zdanie 2
+
+Analizujemy zachowanie reszt w modelu **M** w celu weryfikacji poprawności założeń modelu regresji liniowej.
+
+
+### Podpunkt a
+
+Wyznaczamy rezydua modelu M.
+
+```{r, echo=TRUE}
+rezydua <- residuals(model.aic)
+```
+
+```{r}
+qqnorm(rezydua)
+qqline(rezydua, col = "red", lw = 2)
+```
+
+Możemy zauważyć, że kwantyle znacznie odstają na krańcach wykresu. Nie są one ułożone wzdłuż linii prostej. Zatem odrzucamy założenie o normalności reszt w modelu.
+
+Testowanie hipotez w tym wypadku i wyznaczanie realizacji przedziałów ufności nie jest do końca poprawne, ponieważ reszty nie są z rozkładu normalnego.
+
+### Podpunkt b
+
+Wykonujemy wykresy reszt względem każdej ze zmiennych objaśniających w modelu **M**.
+
+```{r, fig.width=6.5}
+
+zmienne <- c("X1", "X2", "X3", "X4", "X6", "X7")
+par(mfrow = c(2,3))
+for (zmienna in zmienne) {
+  plot(dane_aic[[zmienna]], rezydua,
+       main = paste("Reszty vs", zmienna),
+       xlab = zmienna)
+  abline(h=0, col = "red")
+}
+par(mfrow = c(1,1))
+```
+
+Żaden z wykresów nie wskazuje na osobliwe zachowanie zmiennych. Reszty są losowo rozproszone wokół osi y.
+
+
+### Podpunkt c
+
+Wykonujemy wykresy reszt względem wartości przewidywanych przez model **M**.
+
+```{r echo=TRUE}
+y_predykcje <- model.aic$fitted.values 
+```
+
+
+```{r fig.height=4}
+plot(y_predykcje, rezydua)
+  abline(h=0, col = "red")
+```
+
+Chmura punktów jest losowo rozproszona, nie występują żadne wzorce czy trendy w danych.  Dane są rozmieszczone wokół osi $y=0$, co oznacza, że model wychwycił wszystkie zależności liniowe w danych.
+
+
+
+
+
+
+

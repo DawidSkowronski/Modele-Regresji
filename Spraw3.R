@@ -62,6 +62,7 @@ step(model)
 dane_aic <- dane[,-5]
 
 model_aic <- lm(Y~., data = dane_aic)
+
 plot(model_aic)
 
 # Estymatory MLE beta
@@ -80,10 +81,14 @@ p_wart <- p_F_nowy[1] # Bliskie 0, odrzucamy H0
 # Oznacza to, że przynajmniej jedna ze zmiennych
 # objaśniających ma liniowy wpływ na Y.
 
+#1c
+summary(model_aic)$coefficients[,4] # p-wartości
+
 summary(model_aic)
 
 # (d) Wyznaczyć przedziały ufności na poziomie 0,95 dla współczynników
 # regresji odpowiadających zmiennym z modelu M.
+
 
 confint(model_aic, , level = 0.95) # Bo bierze alpha/2
 # Intercept ma najszerszą realizację przedziału 

@@ -1,0 +1,36 @@
+KONSULTACJE
+Kartkówka będzie zapowiadana - będzie zakres podany
+Komputerówka ze wszystkich list
+Komputerówka - nie ryzykuje się pogorszeniem oceny
+Jeśli jedno spraw nie pójdzie to Komputerówkę można napisać tylko z tego sprawozdania.
+
+Koniec zajęć + 15 min - ostateczny termin oddania
+
+Nie trzeba - wymyślnych wykresów, tabelek, odnośników w tekście.
+
+KARTKÓWKI'
+1) za tydzień na 10 - 15 minut, może być coś jak 1 zadanie teoretyczne z listy 1.
+
+
+LISTA 1
+
+1) wczytanie pliku
+library(readxl)
+quantile()
+
+Wystarczy printować
+
+2) trzeba popatrzeć na wykres rozrzutu, jeśli punkty nie układają się na linii tylko np. na paraboli, to trzeba spierwiastkować.
+
+5) p - wartość w teście
+Mamy rozkład symetryczny, odrzucimy hipotezę gdy statystyka testowa jest za duża lub za mała
+Mamy hipotezę dwustronną
+Jeśli będziemy w jednym krańcu albo drugim
+
+
+p-value = 2(1-F_{n-2}(|t_obserwowalne|) ) pamiętać o wartości bezwzględnej
+
+test na poz istotności alfa oznacza
+
+Przedział ufności na podstawie odwracania testu.
+
