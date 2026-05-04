@@ -1,4 +1,6 @@
 library(ggplot2)
+library(MASS)
+
 
 # Parametry
 n <- 10
@@ -49,7 +51,7 @@ G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
     y_prog <- fun_g(x, stare_beta)
     G <- mac_G(x, beta = stare_beta)
       
-    krok <- solve(t(G) %*% G) %*%
+    krok <- ginv(t(G) %*% G) %*%
       t(G)%*%(y-y_prog)
     
     nowe_beta <- stare_beta + krok
@@ -94,7 +96,7 @@ G_N_tab <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
     G <- mac_G(x, beta = stare_beta)
     
     
-    krok <- solve(t(G) %*% G) %*%
+    krok <- ginv(t(G) %*% G) %*%
       t(G)%*%(y-y_prog)
     
     
