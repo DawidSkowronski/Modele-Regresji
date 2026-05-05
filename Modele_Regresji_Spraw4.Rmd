@@ -31,8 +31,8 @@ header-includes:
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(
-  fig.width = 5,
-  fig.height = 5,
+  fig.width = 6,
+  fig.height = 4,
   out.extra='',
   echo = FALSE,
   warning = FALSE,
@@ -49,6 +49,8 @@ knitr::opts_chunk$set(
   dev.args = list(encoding="CP1257.enc")
 )
 
+set.seed(282241)
+
 ```
 
 ```{r biblioteki}
@@ -60,9 +62,11 @@ library(kableExtra)
 library(car)
 library(GGally)
 library(corrplot)
+library(MASS)
 ```
 
 # Zadanie 1
+
 
 ```{r parametry}
 # Parametry
@@ -74,10 +78,13 @@ b3 <- 2
 sig <- 1/2
 ```
 
+Dla podanych parametrów generujemy `r n` obserwacji postaci
+
+$$y_i = \frac{\beta_1 x_i}{\beta_2 + x_i} + \beta_3 + \varepsilon_i, \; \; i=1,...,n$$
 
 ```{r generowanie_y}
 y_gen <- (b1*x)/(b2+x)+b3 + rnorm(10,mean = 0, sd = sig)
-y_gen
+
 ```
 
 # Zadanie 2
@@ -89,10 +96,178 @@ $$g(x_i,\beta_1,\beta_2,\beta_3) = \frac{\beta_1 x_i}{\beta_2 + x_i} + \beta_3, 
 Gradient $\nabla g(\boldsymbol{x}, \boldsymbol{\beta})$ ma postać
 
 $$\nabla g(\boldsymbol{x}, \boldsymbol{\beta}) = \frac{\partial g(\boldsymbol{x}, \boldsymbol{\beta}) }{\partial \boldsymbol{\beta}} = \left[ \frac{x_i}{\beta_2 + x_i}, - \frac{\beta_1 x_i}{(\beta_2 + x_i)^2}, 1 \right]$$
+```{r, echo=TRUE}
+
+fun_g <- function(x,beta){
+  return((beta[1] * x) / (beta[2] + x) + beta[3])
+}
+
+grad_g <- function(x, beta){
+  return(c(x/(beta[2]+x), - (beta[1] *x)/(beta[2]+x)^2,1))
+}
+
+```
 
 
+# Zadanie 3
+
+Wyznaczamy estymatory $(\widehat{\beta_1}, \widehat{\beta_2}, \widehat{\beta_3}, \widehat{\sigma}^2)$ parametrów $({\beta_1}, {\beta_2}, {\beta_3}, {\sigma}^2)$.
+
+Jako punkt startowy przyjmujemy $({\beta_1}^{(0)}, {\beta_2}^{(0)}, {\beta_3}^{(0)}) = (8,2,1)$
+
+Kryterium stopu:
+$$|| \widehat{\beta}^{(n)} - \widehat{\beta}^{(n-1)} || \le 0.0001 \; \; \text{lub} \; \; n=100.$$
 
 
+```{r, echo=TRUE}
+
+mac_G <- function(wek_x, beta){
+  n <- length(wek_x)
+  p <- length(beta)
+  mac <- matrix(nrow = n, ncol = p)
+  for (i in 1:n){
+    mac[i, ] <- grad_g(wek_x[i], beta = beta)
+  }
+  return(mac)
+}
+
+G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
+  
+  p <- length(beta_0)
+  
+  stare_beta <- beta_0
+  for (i in 1:M){
+    
+    y_prog <- fun_g(x, stare_beta)
+    G <- mac_G(x, beta = stare_beta)
+      
+    krok <- ginv(t(G) %*% G) %*%
+      t(G)%*%(y-y_prog)
+    
+    nowe_beta <- stare_beta + krok
+
+    # Warunek stopu
+    if (sqrt(sum((nowe_beta-stare_beta)^2))<eps){
+      break
+    }
+    stare_beta <- nowe_beta
+  }
+  
+  # Oszacowanie wariancji
+  y_koniec <- fun_g(x, nowe_beta)
+  RSS <- sum((y - y_koniec)^2)
+  sig_kw <- RSS / (n - p)
+  
+  # Oszacowanie macierzy kowariancji
+  mac_cov <- sig_kw * ginv(t(G)%*%G)
+  
+  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i, macierz_cov = mac_cov))
+}
+
+G_N_rozw <- G_N(x,y_gen)
+```
+
+
+# Zadanie 4
+
+Dla kroków s=0,1,2 oraz s=$ostatni$ wyznaczamy wartości estymatorów $\widehat{\beta}^{(s)}, (\widehat{\sigma}^2)^{(s)}$ oraz wartość funkcji logarytmu wiarygodności $l(s) = l(\widehat{\beta}^{(s)}, (\widehat{\sigma}^2)^{(s)})$. 
+
+
+```{r, echo=TRUE}
+
+G_N_tab <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
+  
+  n <- length(x)
+  p <- length(beta_0)
+  
+  historia <- data.frame( )
+  
+  stare_beta <- beta_0
+  for (i in 1:M){
+    
+    y_prog <- fun_g(x, stare_beta)
+    G <- mac_G(x, beta = stare_beta)
+    
+    
+    krok <- ginv(t(G) %*% G) %*%
+      t(G)%*%(y-y_prog)
+    
+    
+    RSS <- sum((y - y_prog) ^ 2)
+    L_log <- -n / 2 * log(2 * pi) - n / 2 * log(RSS /
+            (n - p)) - (n - p) / 2
+    
+    historia <- rbind(
+      historia,
+      data.frame(
+        krok = i,
+        beta1 = stare_beta[1],
+        beta2 = stare_beta[2],
+        beta3 = stare_beta[3],
+        sigma_kw = RSS / (n - p),
+        L = L_log
+      )
+    )
+    
+    nowe_beta <- stare_beta + krok
+    
+    # Warunek stopu
+    if (sqrt(sum((nowe_beta-stare_beta)^2))<eps){
+      break
+    }
+    stare_beta <- nowe_beta
+  }
+  
+  # Oszacowanie wariancji
+  y_koniec <- fun_g(x, nowe_beta)
+  RSS <- sum((y - y_koniec)^2)
+  sig_kw <- RSS / (n - p)
+  
+  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i, historia))
+}
+
+```
+
+
+# Zadanie 5
+
+Porównujemy estymator $\widehat{\beta}$ parametru $\beta$ z rzeczywistą wartością $\beta$.
+
+# Zadanie 6
+
+Na wykresie przedstawiamy wykresy rozrzutu punktów $(x_i,y_i)$ oraz $(x_i,\widehat{y_i})$, gdzie $\widehat{y_i} = g(x_i, \widehat{\beta})$.
+
+```{r, echo=TRUE}
+y_pred <- fun_g(x, G_N_rozw$beta_est)
+```
+
+```{r }
+ggplot()+
+  geom_point(aes(x=x,y=y_gen), col = "black")+
+  geom_line(aes(x=x,y=y_gen), col = "gray")+
+  geom_point(aes(x=x,y=y_pred), col = "red1") +
+  geom_line(aes(x=x,y=y_pred), col = "tomato1") +
+  theme_minimal()
+```
+
+
+# Zadanie 7
+
+Wyznaczamy oszacowanie macierzy kowariancji estymatora $\widehat{\beta}$.
+
+# Zadanie 8
+
+Za pomocą algorytmu Gaussa-Newtona wyznaczamy estymatory $(\widehat{\beta_1}, \widehat{\beta_2}, \widehat{\beta_3}, \widehat{\sigma}^2)$ parametrów $({\beta_1}, {\beta_2}, {\beta_3}, {\sigma}^2)$  dla punktów:
+
+a) $({\beta_1}^{(0)}, {\beta_2}^{(0)}, {\beta_3}^{(0)}) =  (9.7, 2.9, 2)$,
+
+b) $({\beta_1}^{(0)}, {\beta_2}^{(0)}, {\beta_3}^{(0)}) =  (1,1,1)$.
+
+Warunek stopu ustalamy taki sam jak w zadaniu 3.
+
+# Zadanie 9
+
+Porównujemy wyniki otrzymane w zadaniu 8. i 3.
 
 
 

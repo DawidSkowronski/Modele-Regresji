@@ -40,7 +40,6 @@ mac_G <- function(wek_x, beta){
 }
 
 
-
 G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   
   p <- length(beta_0)
@@ -68,7 +67,10 @@ G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   RSS <- sum((y - y_koniec)^2)
   sig_kw <- RSS / (n - p)
   
-  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i))
+  # Oszacowanie macierzy kowariancji
+  mac_cov <- sig_kw * ginv(t(G)%*%G)
+  
+  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i, macierz_cov = mac_cov))
 }
 
 G_N_rozw <- G_N(x,y_gen)
@@ -83,11 +85,6 @@ G_N_tab <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   p <- length(beta_0)
   
   historia <- data.frame( )
-  
-  
-  # Funkcja która wylicza w każdym kroku informacje
-  # Zapisanie tego do ramki danych
-  #
   
   stare_beta <- beta_0
   for (i in 1:M){
