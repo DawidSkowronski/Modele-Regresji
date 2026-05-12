@@ -11,7 +11,7 @@ b3 <- 2
 beta <- c(b1,b2,b3)
 sig <- 1/2
 
-set.seed(1)
+set.seed(2137)
 y_gen <- (b1*x)/(b2+x)+b3 + rnorm(10,mean = 0, sd = sig)
 
 
@@ -39,6 +39,7 @@ mac_G <- function(wek_x, beta){
   return(mac)
 }
 
+# Algorytm G-N
 
 G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   
@@ -64,8 +65,8 @@ G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   
   # Oszacowanie wariancji
   y_koniec <- fun_g(x, nowe_beta)
-  RSS <- sum((y - y_koniec)^2)
-  sig_kw <- RSS / (n - p)
+  SSR <- sum((y - y_koniec)^2)
+  sig_kw <- SSR / (n - p)
   
   # Oszacowanie macierzy kowariancji
   mac_cov <- sig_kw * ginv(t(G)%*%G)
@@ -91,20 +92,20 @@ G_N_tab <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
     
     y_prog <- fun_g(x, stare_beta)
     G <- mac_G(x, beta = stare_beta)
-    
+    print(G)
     
     krok <- ginv(t(G) %*% G) %*%
       t(G)%*%(y-y_prog)
     
     
-    RSS <- sum((y-y_prog)^2)
-    L_log <- -n/2*log(2*pi) - n/2 * log(RSS/(n-p)) - (n-p)/2
+    SSR <- sum((y-y_prog)^2)
+    L_log <- -n/2*log(2*pi) - n/2 * log(SSR/(n-p)) - (n-p)/2
     
-    historia <- rbind(historia, data.frame( krok = i,
+    historia <- rbind(historia, data.frame( krok = i-1,
                                             beta1 = stare_beta[1],
                                             beta2 = stare_beta[2],
                                             beta3 = stare_beta[3],
-                                            sigma_kw = RSS/(n-p),
+                                            sigma_kw = SSR/(n-p),
                                             L = L_log))
     
     nowe_beta <- stare_beta + krok
@@ -118,14 +119,87 @@ G_N_tab <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
   
   # Oszacowanie wariancji
   y_koniec <- fun_g(x, nowe_beta)
-  RSS <- sum((y - y_koniec)^2)
-  sig_kw <- RSS / (n - p)
+  SSR <- sum((y - y_koniec)^2)
+  sig_kw <- SSR / (n - p)
   
-  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i, historia))
+  historia <- rbind(historia, data.frame( krok = i,
+                                          beta1 = nowe_beta[1],
+                                          beta2 = nowe_beta[2],
+                                          beta3 = nowe_beta[3],
+                                          sigma_kw = SSR/(n-p),
+                                          L = L_log))
+  
+  
+  return(list(beta_est = nowe_beta, sigma2_est = sig_kw, iteracje = i, historia = historia))
 }
 
 # Algorytm z historią
-G_N_tab(x,y_gen)
+GN_historia <- G_N_tab(x,y_gen)
+
+pierwsze_i_ostatnie_obs <- rbind(GN_historia$historia[c(1,2,3,7),], c("rzeczywiste",10,3,2,1/4,"L"))
+
+# Algorytm Gaussa Newtona
+G_N <- function(x,y, beta_0 = c(8,2,1), eps=0.0001 , M=100){
+  
+  n <- length(x)
+  p <- length(beta_0)
+  
+  stare_beta <- beta_0
+  
+  y_prog0 <- fun_g(x, beta_0)
+  SSR <- sum((y-y_prog0)^2)
+  
+  # Krok zerowy
+  historia <- data.frame()
+  
+  for (i in 1:M){
+    
+    y_prog <- fun_g(x, stare_beta)
+    G <- mac_G(x, beta = stare_beta)
+    
+    SSR <- sum((y-y_prog)^2)
+    krok <- ginv(t(G) %*% G) %*% t(G)%*%(y-y_prog)
+
+    nowe_beta <- stare_beta + krok
+    
+    historia <- rbind(
+      historia,
+      data.frame(
+        krok = i-1,
+        beta1 = stare_beta[1],
+        beta2 = stare_beta[2],
+        beta3 = stare_beta[3],
+        sigma_kw = SSR / (n - p)
+      )
+    )
+    
+    # Warunek stopu
+    if (sqrt(sum((nowe_beta-stare_beta)^2))<eps){
+      break
+    }
+    stare_beta <- nowe_beta
+  }
+  
+  y_prog <- fun_g(x, nowe_beta)
+  G <- mac_G(x, beta = nowe_beta)
+  
+  SSR <- sum((y-y_prog)^2)
+  
+  historia <- rbind(
+    historia,
+    data.frame(
+      krok = i,
+      beta1 = nowe_beta[1],
+      beta2 = nowe_beta[2],
+      beta3 = nowe_beta[3],
+      sigma_kw = SSR / (n - p)
+    )
+  )
+  
+  return(return(historia))
+}
+
+G_N(x,y_gen)
 
 
 
