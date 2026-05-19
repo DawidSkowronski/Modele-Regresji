@@ -1,0 +1,277 @@
+---
+title: "Sprawozdanie - regresja logistyczna"
+author: "Dawid Skowroński"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    number_sections: true
+    dev: cairo_pdf
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage[OT4]{polski}
+- \usepackage[utf8]{inputenc}
+- \usepackage{graphicx}
+- \usepackage{float}
+- \usepackage{amsmath}
+- \usepackage{rotating}
+- \usepackage{bbm}
+- \usepackage{booktabs}
+- \usepackage{longtable}
+- \usepackage{array}
+- \usepackage{float}
+- \usepackage{graphicx}
+- \renewcommand{\contentsname}{Spis treści}
+- \renewcommand{\listfigurename}{Spis wykresów i rysunków}
+- \renewcommand{\listtablename}{Spis tabel}
+- \renewcommand{\figurename}{Wykres}
+- \renewcommand{\tablename}{Tabela}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.height = 4,
+  out.extra='',
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  error = FALSE,
+  cache=FALSE,
+  dev.args = list(png = list(type = "cairo")))
+
+knitr::opts_chunk$set(
+  fig.pos = "H",
+  out.extra = "",
+  fig.align = "center",
+  dev = "pdf",
+  dev.args = list(encoding="CP1257.enc")
+)
+
+set.seed(123)
+
+```
+
+```{r biblioteki}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(readxl)
+library(kableExtra)
+library(car)
+library(GGally)
+library(corrplot)
+library(MASS)
+library(pROC)
+```
+
+
+# Generowanie zbioru danych do regresji logistycznej
+
+Na podstawie odpowiednich wartości parametrów generujemy dane, rozmiar próby $n$=300, liczba zmiennych objaśniających $p$=20.Zmienna objaśniająca $X_1$ jest stale równa 1.
+
+Przyjmujemy, że tylko zmienne $X_1,...,X_10$ maja niezerowe współczynniki $\beta_1, ..., \beta_10$. Pozostałe zmienne mają odpowiednie współczynniki regresji równe 0.
+
+Zmienne objaśniane będziemy generować z rozkładu standardowego normalnego, natomiast zmienna objaśniana $Y$ jest zmienną binarną, która przyjmuje wartości 0 i 1 z prawdopodobieństwem odpowiednio $1-\pi(x_i)$ oraz $\pi(x_i)$.
+
+```{r, echo=TRUE}
+n <- 300
+p <- 20
+
+X <- matrix(rnorm(n*p,2,5),ncol = p, nrow = n)
+X[,1] <- rep(1,n)
+
+beta <- c(rnorm(10,0,1/4),numeric(10))
+
+pi <- 1/(1 + exp(-X %*% beta))
+
+colnames(X) <- sapply(1:p, function(i){paste0("X",i)})
+
+dane <- data.frame(X)
+dane$Y <- rbinom(n,1,pi)
+```
+
+Otrzymane dane łączymy w ramkę danych i zapisujemy do pliku CSV.
+
+```{r, echo=TRUE}
+colnames(X) <- sapply(1:p, function(i){paste0("X",i)})
+
+dane <- data.frame(X)
+dane$Y <- rbinom(n,1,pi)
+
+# Zapisanie danych do pliku
+write.csv(dane, "dane.csv", row.names = FALSE)
+
+```
+
+# Konstrukcja modelu regresji logistycznej
+
+## Zadanie 1
+
+Wczytujemy wcześniej wygenerowane dane i dokonujemy podziału na zbiór treningowy oraz testowy w proporcji 70:30. 
+
+```{r, echo=TRUE}
+dane <- read.csv(
+  file = 'dane.csv',
+  sep = ",",
+  dec = ".",
+  check.names = FALSE
+)
+
+
+ind.y0 <- which(dane$Y==0)
+ind.y1 <- which(dane$Y==1)
+
+# Dzielimy dane na zbiory zawierające y=1 i y=0
+train.0 <- sample(ind.y0, size = floor(0.7*length(ind.y0)))
+train.1 <- sample(ind.y1, size = floor(0.7*length(ind.y1)))
+
+ind.train <- sort(c(train.0,train.1))
+ind.test <- setdiff(seq_len(nrow(dane)), ind.train)
+
+# Zbiór uczący
+train <- dane[ind.train,]
+# Zbiór testowy
+test <- dane[ind.test,]
+```
+
+Wygenerowane dane zawierają `r nrow(train.1)` obserwacje, dla których zmienna objaśniana $Y$ przyjmuje wartość 1.
+
+Wyznaczamy średnią w obu zbiorach, aby sprawdzić czy frakcja rekordów  ze zmienną y=1 jest zbliżona.
+
+```{r, echo=TRUE}
+mean(train$Y)
+mean(test$Y)
+```
+
+
+Na podstawie zbioru treningowego tworzymy model regresji logistycznej.
+
+```{r,echo=TRUE}
+
+model.pelny <- glm(Y~., data = train[-1], family = binomial)
+
+model.0 <- glm(Y~1, data = train[-1], family = binomial)
+```
+
+Za pomocą testu ilorazu wiarygodności weryfikujemy hipotezę zerową $H_0: \beta_2 = ... = \beta_p = 0$, która stwierdza, że żadna ze zmiennych objaśniających $X_2,...,X_p$ nie wpływa na zmienną objaśnianą $Y$.
+
+```{r, echo=TRUE}
+test.anova <- anova(model.0, model.pelny, test = 'LRT')
+pval <- test.anova$`Pr(>Chi)`[2]
+```
+
+Otrzymujemy $p$-wartość równą `r pval`. Oznacza to, że na poziomie istotności $\alpha$=0.05 należy odrzucić hipotezę $H_0$, tzn. przynajmniej jedna ze zmiennych objaśnianych $X_2,...,X_p$ wpływa na zmienną objaśnianą $Y$.
+
+Dla każdego z parametrów $\beta_i, i=2,...,p$ 
+
+a) wyznaczamy estymatory parametrów $\beta_i$ oraz ich błędy standardowe,
+
+```{r, echo=TRUE}
+info <- round(summary(model.pelny)$coefficients, 6)
+info
+```
+
+
+b) tworzymy realizacje przedziałów ufności na poziomie $1-\alpha$,
+
+```{r, echo=TRUE}
+przedzialy <- confint(model.pelny)
+przedzialy
+```
+
+c) weryfikujemy hipotezę $H_0: \beta_i=0$ przeciwko $H_1: \beta_i \neq 0$ 
+
+Jeśli wartość 0 nie znajduje się wewnątrz realizacji przedziału ufności, nie mamy podstaw do odrzucenia hipotezy $H_0$.
+
+Zatem, istotne zmienne to: $X_2,X_3,X_5,X_6,X_8,X_{10},X_{17}$.
+
+
+
+Porównujemy wektor parametrów $\beta$ z jego estymatorem $\widehat{\beta}$.
+
+```{r}
+cbind(beta, coef(model.pelny))
+```
+
+
+Możemy zauważyć, że dla niektórych zmiennych (np. dla $X_4$) estymator błędnie zidentyfikował znaki elementów wektora $\beta$. Większość wartości estymatora jest zbliżona do rzeczywistych niezerowych wartości wektora $\beta$. Natomiast, zerowe elementy wektora $\beta$ zostały błędnie zidentyfikowane.
+
+## Zadanie 2
+
+Wyznaczamy iloraz szans zmiennej $X_i = e^{\beta_i}$
+
+```{r, echo=TRUE}
+szansa <- exp(coef(model.pelny))
+szansa
+```
+
+Dla zmiennej $X_2$ oznacza to, że jeśli zwiększymy wartość zmiennej $X_2$ o jeden, to szansa na to, że zmienna $Y$ przyjmie wartość równą 1 wzrasta o około 36%.
+
+Dla zmiennej $X_3$ oznacza to, że jeśli zwiększymy wartość zmiennej $X_3$ o jeden, to szansa na to, że zmienna $Y$ przyjmie wartość równą 1 maleje o około 24%.
+
+
+## Zadanie 3
+
+Wyznaczamy oszacowane prawdopodobieństwa wartości $Y$ dla każdej z obserwacji zbioru testowego. Tworzymy także tabelę klasyfikacji oraz oraz miary zdolności predykcyjnej modelu.
+
+```{r, echo=TRUE}
+
+predict.test <- predict(model.pelny, newdata = test, type = 'response')
+
+#Informacja o macierzy pomyłek
+info.cm <- function(punkt){
+  pred.class <- ifelse(predict.test>punkt,1,0)
+  
+  # Macierz pomyłek
+  cm <- table(pred=pred.class, real = test$Y)
+  
+  sensit <- cm[2,2]/sum(cm[,2])
+  specif <- cm[1,1]/sum(cm[,1])
+  fpr <- cm[2,1]/sum(cm[,1])
+  fnr <- cm[1,2]/sum(cm[,2])
+  
+  acc <-  sum(diag(cm))/sum(cm)
+  
+  return(list(cm=cm,sensit=sensit,specif=specif,fpr=fpr,fnr=fnr, acc=acc))
+}
+
+M.1 <- info.cm(0.5)
+M.2 <- info.cm(0.7)
+
+M.1$cm
+M.2$cm
+
+zestawienie <- rbind(c(0.5,0.7),cbind(M.1[-1],M.2[-1]))
+zestawienie
+
+```
+
+Analizując zestawienie miar, możemy zauważyć że dokładność jest równa dla obu modeli. Czułość jest większa dla odcięcia $\pi_0$=0.5, natomiast dla odcięcia $\pi_0$=0.7 większa jest specyficzność. Zatem, stwierdzamy, że model z odcięciem $\pi_0$=0.5 jest lepszy, ponieważ ma większą wartość czułości oraz mniejszą wartość FNR.
+
+
+## Zadanie 4
+
+Wykorzystujemy zbiór testowy do narysowania krzywej ROC. Wyznaczyć
+pole pod krzywą ROC (AUC).
+
+
+```{r, echo=TRUE}
+roc.obj <- roc(test$Y, predict.test)
+auc <- auc(roc.obj)
+```
+
+Wartość AUC wynosi `r auc`, jest to wynik bliski 1.Oznacza to bardzo dobre dopasowanie modelu do danych testowych.
+
+```{r}
+plot(roc.obj, 
+     main = "Krzywa ROC dla modelu na zbiorze testowym", 
+     col = "blue", 
+     lwd = 2, 
+     print.auc = TRUE,
+     grid = TRUE)
+```
+
+
+
