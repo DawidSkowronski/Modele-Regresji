@@ -258,3 +258,124 @@ plot(krzywa_roc,
 # Wartość auc
 wart_auc <- auc(krzywa_roc)
 wart_auc
+
+######## Rozwiązanie Zajęcia ########
+
+set.seed(123)
+n <- 300
+p <- 20
+
+X <- matrix(rnorm(n*p,2,5),ncol = p, nrow = n)
+X[,1] <- rep(1,n)
+
+beta <- c(rnorm(10,0,1/4),numeric(10))
+
+pi <- 1/(1 + exp(-X %*% beta))
+
+colnames(X) <- sapply(1:p, function(i){paste0("X",i)})
+
+dane <- data.frame(X)
+dane$Y <- rbinom(n,1,pi)
+dane
+
+write.csv(dane, "dane.csv", row.names = FALSE)
+
+dane <- read.csv(
+  file = 'dane.csv',
+  sep = ",",
+  dec = ".",
+  check.names = FALSE
+)
+
+ind.y0 <- which(dane$Y==0)
+ind.y1 <- which(dane$Y==1)
+
+train.0 <- sample(ind.y0, size = floor(0.7*length(ind.y0)))
+train.1 <- sample(ind.y1, size = floor(0.7*length(ind.y1)))
+
+ind.train <- sort(c(train.0,train.1))
+ind.test <- setdiff(seq_len(nrow(dane)), ind.train)
+
+train <- dane[ind.train,]
+test <- dane[ind.test,]
+
+# Wyznaczamy średnią aby sprawdzić czy frakcja y=0 jest zbliżona
+
+mean(train$Y)
+mean(test$Y)
+# Jest zbliżona
+
+
+# Zadanie 1
+
+# Wyrzucamy X1, inaczej występuję problem z interpretacją współczynników
+
+model.pelny <- glm(Y~., data = train[-1], family = binomial)
+model.0 <- glm(Y~1, data = train[-1], family = binomial)
+
+test.anova <- anova(model.0, model.pelny, test = 'LRT')
+test$`Pr(>Chi)`[2]
+
+przedzialy <- confint(model.pelny)
+przedzialy
+
+# Większość przedziałów zawiera 0, 
+# niektóre zmienne które były nieistotne okazały się istotne i odwrotnie
+
+info <- round(summary(model.pelny)$coefficients, 6)
+info
+
+# Patrząc na p-wartość możemy stwierdzić, które współczynniki są istotne
+
+cbind(beta, coef(model.pelny))
+
+# Szansa na wystąpienie zdarzenia
+
+# wybrać dwa współczynniki, 
+# jeden dodatni drugi ujemny i podać jak ta szansa się zmienia
+
+
+# Zadanie 3
+# Używamy funkcji predict
+
+# Mamy oszacowane prawdopodobieństwa wszysktie dla każdej obserwacji po kolei
+predict.test <- predict(model.pelny, newdata = test, type = 'response')
+head(test)
+  #Informacja o macierzy pomyłek
+info.cm <- function(punkt){
+  pred.class <- ifelse(predict.test>punkt,1,0)
+  
+  # Macierz pomyłek
+  cm <- table(pred=pred.class, real = test$Y)
+  
+  sensit <- cm[2,2]/sum(cm[,2])
+  specif <- cm[1,1]/sum(cm[,1])
+  fpr <- cm[2,1]/sum(cm[,1])
+  fnr <- cm[1,2]/sum(cm[,2])
+  
+  acc <-  sum(diag(cm))/sum(cm)
+  
+  return(list(cm=cm,sensit=sensit,specif=specif,fpr=fpr,fnr=fnr, acc=acc))
+}
+
+M.1 <- info.cm(0.5)
+M.2 <- info.cm(0.7)
+
+library(pROC)
+roc.obj <- roc(test$Y, predict.test)
+auc(roc.obj)
+# Model jest bardzo dobrze dopasowany, ale współczynniki są nieistotne
+
+plot(roc.obj, 
+     main = "Krzywa ROC dla modelu na zbiorze testowym", 
+     col = "blue", 
+     lwd = 2, 
+     print.auc = TRUE,
+     grid = TRUE)
+
+
+# Mamy zmienną e^x2 jeżeli wart zmiennej x2 zwiększymy o 1, to szansa na to, że zmienna Y przyjmie wartość wzrasta o około  %/ maleje o 
+# 
+# Szansa 1.2 oznacza że zwiększenie wartości Xi o jedną jednostkę zwiększa szansę na przypisanie Y=1 o 20%.
+# 
+# Szansa na to że Y=1 jest mnożone przez 1.2
